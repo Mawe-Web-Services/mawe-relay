@@ -1,5 +1,6 @@
 import * as Docker from "dockerode";
 import { exec, spawn } from "child_process";
+import { v4 as uuidv4 } from 'uuid';
 
 class DockerService {
   private docker: Docker;
@@ -9,6 +10,7 @@ class DockerService {
   }
 
   async deploy({ image, repository }: { image: string; repository: string }) {
+    const applicationId = uuidv4();
     await this.getImage({ image, repository });
 
     let PORT = 3000;
@@ -26,7 +28,7 @@ class DockerService {
     if (PORT <= LIMIT_PORT) {
         await this.executeDockerContainer({ image, repository, port: PORT });
         const tunnelUrl = await this.createTunnel(PORT);
-        return { tunnelUrl: tunnelUrl };
+        return { tunnelUrl: tunnelUrl, applicationId: applicationId};
     } else {
         console.log(`Nenhuma porta disponível encontrada entre 3000 e ${LIMIT_PORT}.`);
     }
