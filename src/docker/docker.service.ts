@@ -9,13 +9,13 @@ class DockerService {
     this.docker = new Docker();
   }
 
-  async deploy({ image, repository }: { image: string; repository: string }) {
+  async deploy({ image, repository }: { image: string; repository: string}) {
     const applicationId = uuidv4();
     await this.getImage({ image, repository });
 
     let PORT = 3000;
     let IS_PORT_IN_USE = true; 
-    let LIMIT_PORT = 3010;     
+    let LIMIT_PORT = 3010;
 
     while (IS_PORT_IN_USE && PORT <= LIMIT_PORT) {
         IS_PORT_IN_USE = await this.isPortInUse(PORT);
@@ -66,9 +66,18 @@ class DockerService {
     }
   }
 
-   async executeDockerContainer( {image,repository,port}:{image:string,repository:string, port:number}) {
+   async executeDockerContainer( {
+    image,
+    repository,
+    port
+  }:
+    {
+      image:string,
+      repository:string, 
+      port:number
+    }) {
     
-    const dockerRunCommand = `docker run --cap-drop=ALL --cap-add=NET_RAW --cap-add=NET_BIND_SERVICE --rm -p ${port}:3000 -d ${repository}/${image}`;
+    const dockerRunCommand = `docker run --cap-drop=ALL --cap-add=NET_RAW --cap-add=NET_BIND_SERVICE --rm -p ${port}:3003 -d ${repository}/${image}`;
 
     return await new Promise((resolve, reject) => {
       exec(dockerRunCommand, (err, stdout, stderr) => {

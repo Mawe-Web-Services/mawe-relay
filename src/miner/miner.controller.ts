@@ -7,7 +7,7 @@ export class MinerController {
   constructor(private readonly minerService: MinerService) {}
 
   @Post()
-  async deployImage(@Body() body: { query: string, dificulty:number }): Promise<IMinerResponse> {
+  async miner(@Body() body: { query: string, dificulty:number }): Promise<IMinerResponse> {
     const { query, dificulty } = body;
     if (!query || !dificulty) {
       throw new Error('Image name is required');

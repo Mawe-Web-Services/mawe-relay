@@ -7,11 +7,17 @@ export class DockerController {
   constructor(private readonly dockerService: DockerService) {}
 
   @Post('deploy')
-  async deployImage(@Body() body: { imageName: string, repository:string }): Promise<IDeployResponse> {
+  async deployImage(@Body() body: { 
+    imageName: string, 
+    repository:string, 
+  }): Promise<IDeployResponse> {
     const { imageName, repository } = body;
-    if (!imageName) {
-      throw new Error('Image name is required');
+
+    if (!imageName || !repository) {
+      throw new Error('ImageName, repository propertie is required');
     }
+
+
 
     try {
       const response = await this.dockerService.deploy({image: imageName, repository: repository});
