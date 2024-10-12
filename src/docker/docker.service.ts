@@ -1,6 +1,7 @@
 import * as Docker from "dockerode";
 import { exec, spawn } from "child_process";
 import { v4 as uuidv4 } from 'uuid';
+import { IHibernateResponse } from "./interfaces/IHibernateResponse";
 
 class DockerService {
   private docker: Docker;
@@ -11,7 +12,7 @@ class DockerService {
 
   async deploy({ image, repository }: { image: string; repository: string}) {
     const applicationId = uuidv4();
-    await this.getImage({ image, repository });
+    const imageId = await this.getImage({ image, repository });
 
     let PORT = 3000;
     let IS_PORT_IN_USE = true; 
@@ -28,7 +29,7 @@ class DockerService {
     if (PORT <= LIMIT_PORT) {
         await this.executeDockerContainer({ image, repository, port: PORT });
         const tunnelUrl = await this.createTunnel(PORT);
-        return { tunnelUrl: tunnelUrl, applicationId: applicationId};
+        return { tunnelUrl: tunnelUrl, applicationId: applicationId, imageId:imageId};
     } else {
         console.log(`Nenhuma porta disponível encontrada entre 3000 e ${LIMIT_PORT}.`);
     }
@@ -63,7 +64,29 @@ class DockerService {
         "\x1b[32m%s\x1b[0m",
         `Image "${repository}/${image}" successfully downloaded!`
       );
+      
     }
+    const imageDetails = await imageAPI.inspect();
+    return imageDetails.Id;
+  }
+
+  private execCommand(command: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const exec = require('child_process').exec;
+  
+      exec(command, (error: any, stdout: string, stderr: string) => {
+        if (error) {
+          return reject(error);
+        }
+        if (stderr) {
+          console.error(`stderr: ${stderr}`);
+          return reject(new Error(stderr));
+        }
+        console.log(`stdout: ${stdout}`);
+        resolve();
+        return;
+      });
+    });
   }
 
    async executeDockerContainer( {
@@ -126,6 +149,53 @@ class DockerService {
         }
       });
     });
+  }
+
+  async hibernate({ imageId }: { imageId: string }): Promise<IHibernateResponse> {
+    try {
+      const containers = await this.docker.listContainers({
+        all: true,
+        filters: {
+          ancestor: [imageId],
+        },
+      });
+  
+      if (containers.length > 0) {
+        console.log(
+          "\x1b[32m%s\x1b[0m",
+          `Container(s) found for Image ID "${imageId}":`
+        );
+  
+        for (const container of containers) {
+          const containerAPI = this.docker.getContainer(container.Id);
+          
+          await containerAPI.stop();
+          console.log(
+            "\x1b[32m%s\x1b[0m",
+            `Container ID: ${container.Id} stopped.`
+          );
+
+          console.log(
+            "\x1b[32m%s\x1b[0m",
+            `service from this image ID: ${imageId} in hibernating.`
+          );
+
+          return { status: "SUCCESS", code: 200 };
+
+        }
+      } else {
+        console.log(
+          "\x1b[33m%s\x1b[0m",
+          `No containers found for Image ID "${imageId}".`
+        );
+        return { status: "ERROR", code: 404 };
+      }
+  
+      
+    } catch (error) {
+      console.error("\x1b[31m%s\x1b[0m", "Error:", error);
+      return { status: "ERROR", code: 500 };
+    }
   }
 
 }
