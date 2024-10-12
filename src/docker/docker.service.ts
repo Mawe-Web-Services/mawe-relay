@@ -2,6 +2,7 @@ import * as Docker from "dockerode";
 import { exec, spawn } from "child_process";
 import { v4 as uuidv4 } from 'uuid';
 import { IHibernateResponse } from "./interfaces/IHibernateResponse";
+import { IActivateResponse } from "./interfaces/IActivateResponse";
 
 class DockerService {
   private docker: Docker;
@@ -14,9 +15,9 @@ class DockerService {
     const applicationId = uuidv4();
     const imageId = await this.getImage({ image, repository });
 
-    let PORT = 3000;
+    let PORT = 1024;
     let IS_PORT_IN_USE = true; 
-    let LIMIT_PORT = 3010;
+    let LIMIT_PORT = 49151;
 
     while (IS_PORT_IN_USE && PORT <= LIMIT_PORT) {
         IS_PORT_IN_USE = await this.isPortInUse(PORT);
@@ -31,7 +32,7 @@ class DockerService {
         const tunnelUrl = await this.createTunnel(PORT);
         return { tunnelUrl: tunnelUrl, applicationId: applicationId, imageId:imageId};
     } else {
-        console.log(`Nenhuma porta disponível encontrada entre 3000 e ${LIMIT_PORT}.`);
+        console.log(`Nenhuma porta disponível encontrada entre 1024 e ${LIMIT_PORT}.`);
     }
 }
 
@@ -68,25 +69,6 @@ class DockerService {
     }
     const imageDetails = await imageAPI.inspect();
     return imageDetails.Id;
-  }
-
-  private execCommand(command: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const exec = require('child_process').exec;
-  
-      exec(command, (error: any, stdout: string, stderr: string) => {
-        if (error) {
-          return reject(error);
-        }
-        if (stderr) {
-          console.error(`stderr: ${stderr}`);
-          return reject(new Error(stderr));
-        }
-        console.log(`stdout: ${stdout}`);
-        resolve();
-        return;
-      });
-    });
   }
 
    async executeDockerContainer( {
@@ -159,6 +141,7 @@ class DockerService {
           ancestor: [imageId],
         },
       });
+
   
       if (containers.length > 0) {
         console.log(
@@ -195,6 +178,53 @@ class DockerService {
     } catch (error) {
       console.error("\x1b[31m%s\x1b[0m", "Error:", error);
       return { status: "ERROR", code: 500 };
+    }
+  }
+
+  async activate({ imageId }: { imageId: string }): Promise<IActivateResponse> {
+    try {
+      let PORT = 1024;
+      let IS_PORT_IN_USE = true; 
+      const LIMIT_PORT = 49151;
+  
+      while (IS_PORT_IN_USE && PORT <= LIMIT_PORT) {
+        IS_PORT_IN_USE = await this.isPortInUse(PORT);
+        if (!IS_PORT_IN_USE) {
+          break;
+        }
+        PORT++; 
+      }
+  
+      if (PORT > LIMIT_PORT) {
+        console.log(`Nenhuma porta disponível encontrada entre 1024 e ${LIMIT_PORT}.`);
+        return { status: "ERROR", code: 500, tunnelUrl: "" };
+      }
+  
+      const dockerRunCommand = `docker run --cap-drop=ALL --cap-add=NET_RAW --cap-add=NET_BIND_SERVICE --rm -p ${PORT}:3003 -d ${imageId}`;
+  
+       await new Promise<string>((resolve, reject) => {
+        exec(dockerRunCommand, (err, stdout, stderr) => {
+          if (err) {
+            console.log("error container", stderr)
+            reject(err);
+          } else {
+            resolve(stdout.trim()); 
+          }
+        });
+      });
+  
+
+      const tunnelUrl = await this.createTunnel(PORT);
+  
+      return {
+        status: "SUCCESS",
+        code: 200,
+        tunnelUrl: tunnelUrl,
+      };
+  
+    } catch (error) {
+      console.error("\x1b[31m%s\x1b[0m", "Error during activation:", error);
+      return { status: "ERROR", code: 500, tunnelUrl: "" };
     }
   }
 

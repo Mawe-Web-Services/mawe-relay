@@ -2,6 +2,7 @@ import { Controller, Post, Body } from '@nestjs/common';
 import DockerService from './docker.service';
 import { IDeployResponse } from './interfaces/IDeployResponse';
 import { IHibernateResponse } from './interfaces/IHibernateResponse';
+import { IActivateResponse } from './interfaces/IActivateResponse';
 
 @Controller('docker')
 export class DockerController {
@@ -34,12 +35,31 @@ export class DockerController {
     imageId: string, 
   }): Promise<IHibernateResponse> {
     const { imageId} = body;
+    const dockerImageId = imageId.replace('sha256:','');
 
 
 
     try {
-      const response = await this.dockerService.hibernate({imageId: imageId});
-      console.log(imageId);
+      const response = await this.dockerService.hibernate({imageId: dockerImageId});
+      return response;
+    } catch (error) {
+      console.error('Error deploying image:', error);
+      throw new Error(`Deployment failed: ${error.message}`);
+    }
+  }
+
+  @Post('activate')
+  async activateService(@Body() body: { 
+    imageId: string, 
+  }): Promise<IActivateResponse> {
+    const { imageId,} = body;
+    const dockerImageId = imageId.replace('sha256:','');
+
+
+
+    try {
+      const response = await this.dockerService.activate({imageId: dockerImageId});
+    
       return response;
     } catch (error) {
       console.error('Error deploying image:', error);
