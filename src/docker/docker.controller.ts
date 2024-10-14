@@ -33,14 +33,15 @@ export class DockerController {
   @Post('hibernate')
   async hibernateService(@Body() body: { 
     imageId: string, 
+    tunnelUrl: string,
   }): Promise<IHibernateResponse> {
-    const { imageId} = body;
+    const { imageId, tunnelUrl} = body;
     const dockerImageId = imageId.replace('sha256:','');
 
 
 
     try {
-      const response = await this.dockerService.hibernate({imageId: dockerImageId});
+      const response = await this.dockerService.hibernate({imageId: dockerImageId, tunnelUrl: tunnelUrl});
       return response;
     } catch (error) {
       console.error('Error deploying image:', error);

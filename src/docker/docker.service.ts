@@ -4,9 +4,11 @@ import { platform } from "os";
 import { v4 as uuidv4 } from 'uuid';
 import { IHibernateResponse } from "./interfaces/IHibernateResponse";
 import { IActivateResponse } from "./interfaces/IActivateResponse";
+import localtunnel = require('localtunnel');
 
 class DockerService {
   private docker: Docker;
+  private tunnels: {url: string, port: number}[] = [];
 
   constructor() {
     this.docker = new Docker();
@@ -97,13 +99,16 @@ class DockerService {
   }
 
   private async createTunnel(port: number): Promise<string> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       const tunnel = spawn('npx', ['lt', '--port', `${port}`]);
-  
       tunnel.stdout.on('data', (data) => {
         const output = data.toString().trim();
         if (output.includes('your url is:')) {
           const url = output.split('your url is:')[1].trim();
+          this.tunnels.push({
+            url: url,
+            port: port
+          })
           console.log(`Túnel criado com sucesso: ${url}`);
           resolve(url);
         }
@@ -141,8 +146,16 @@ class DockerService {
     });
   }
 
-  async hibernate({ imageId }: { imageId: string }): Promise<IHibernateResponse> {
+  async hibernate({ imageId, tunnelUrl }: { imageId: string, tunnelUrl:string }): Promise<IHibernateResponse> {
+    
     try {
+      const tunnelPort:number = this.tunnels.find((tunnel) => tunnel.url === tunnelUrl)?.port;
+      const newTunnel = await localtunnel(tunnelPort);
+      newTunnel.close();
+      console.log(
+        "\x1b[33m%s\x1b[0m",
+        `Tunnel has closed to: "${tunnelUrl}":`
+      );
       const containers = await this.docker.listContainers({
         all: true,
         filters: {
