@@ -1,5 +1,6 @@
 import * as Docker from "dockerode";
 import { exec, spawn } from "child_process";
+import { platform } from "os";
 import { v4 as uuidv4 } from 'uuid';
 import { IHibernateResponse } from "./interfaces/IHibernateResponse";
 import { IActivateResponse } from "./interfaces/IActivateResponse";
@@ -108,11 +109,6 @@ class DockerService {
         }
       });
   
-      tunnel.stderr.on('data', (data) => {
-        console.error(`Erro no túnel: ${data}`);
-        reject(new Error(data.toString()));
-      });
-  
       tunnel.on('close', (code) => {
         if (code !== 0) {
           reject(new Error(`O processo de túnel fechou com código: ${code}`));
@@ -123,7 +119,19 @@ class DockerService {
 
   private async isPortInUse(port: number): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      exec(`lsof -i :${port}`, (err, stdout, stderr) => {
+      const osPlatform = platform();
+      let command: string;
+  
+      if (osPlatform === "darwin" || osPlatform === "linux") {
+        command = `lsof -i :${port}`;
+      } else if (osPlatform === "win32") {
+        command = `netstat -aon | findstr :${port}`;
+      } else {
+        reject(new Error("Unsupported OS"));
+        return;
+      }
+  
+      exec(command, (err, stdout, stderr) => {
         if (err) {
           resolve(false);
         } else {
